@@ -1,0 +1,31 @@
+name: tarot-sam3
+channels:
+  - nvidia
+  - pytorch
+  - conda-forge
+dependencies:
+  - python=3.12
+  - pip
+  - git
+  - numpy
+  - scipy
+  - pandas
+  - pillow
+  - matplotlib
+  - tqdm
+  - pyyaml
+  - pip:
+      - torch==2.10.0
+      - torchvision
+      - git+https://github.com/huggingface/transformers
+      - accelerate
+      - qwen-vl-utils[decord]==0.0.8
+      - huggingface_hub
+      - opencv-python
+      - pycocotools
+      - scikit-image
+      - einops
+      - ninja
+      - pytest
+      - ipykernel
+      - jupyter

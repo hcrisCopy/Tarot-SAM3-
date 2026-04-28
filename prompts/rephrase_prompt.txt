@@ -1,0 +1,11 @@
+Rephrase the original referring expression into two target-centric expressions.
+
+Return strict JSON:
+{
+  "short_expression": "...",
+  "long_expression": "..."
+}
+
+The short expression should be concise.
+The long expression should preserve useful relation context.
+

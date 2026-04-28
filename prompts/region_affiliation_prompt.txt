@@ -1,0 +1,8 @@
+Given an image, a referring expression, a high-confidence target region, and one discriminative region, judge whether the discriminative region belongs to the same target object.
+
+Return strict JSON:
+{
+  "belongs_to_target": true,
+  "reason": "..."
+}
+

@@ -1,0 +1,9 @@
+Given the target name, a refer object name, and the detected refer-object box, describe the visual relationship that can verify whether a candidate target mask is correct.
+
+Return strict JSON:
+{
+  "relationship": "...",
+  "positive_criteria": ["..."],
+  "negative_criteria": ["..."]
+}
+

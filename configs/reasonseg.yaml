@@ -1,0 +1,10 @@
+inherits: configs/default.yaml
+
+dataset:
+  name: reasonseg
+  root: datasets/reason_seg/ReasonSeg
+  split: val
+  metric:
+    - gIoU
+    - cIoU
+

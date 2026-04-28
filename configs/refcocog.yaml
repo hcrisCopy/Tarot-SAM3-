@@ -1,0 +1,11 @@
+inherits: configs/default.yaml
+
+dataset:
+  name: refcocog
+  root: datasets/refer_seg
+  image_root: datasets/refer_seg/images/mscoco/images/train2014
+  split: val
+  split_by: umd
+  metric:
+    - gIoU
+

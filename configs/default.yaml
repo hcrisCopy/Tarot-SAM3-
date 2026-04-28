@@ -1,0 +1,44 @@
+project:
+  name: Tarot-SAM3
+  seed: 42
+  output_dir: outputs
+
+paths:
+  checkpoints_dir: checkpoints
+  datasets_dir: datasets
+  sam3_repo: external/sam3
+  refer_repo: external/refer
+
+models:
+  mllm:
+    name: Qwen/Qwen2.5-VL-7B-Instruct
+    local_path: checkpoints/Qwen2.5-VL-7B-Instruct
+    dtype: bfloat16
+    device_map: auto
+    max_new_tokens: 512
+  sam3:
+    repo_path: external/sam3
+    checkpoint_dir: checkpoints/sam3
+  dino:
+    name: facebook/dinov3-vits16-pretrain-lvd1689m
+    local_path: checkpoints/dinov3-vitb16
+    dtype: float16
+
+method:
+  tau: 0.80
+  sneg: 0.30
+  text_prompt_topk: 3
+  mask_score_topk: 5
+  point_prompt:
+    max_positive_points: 2
+    max_negative_points: 1
+  msr:
+    enable: true
+    max_refine_rounds: 1
+
+runtime:
+  device: cuda
+  num_workers: 4
+  save_visualizations: true
+  save_intermediate_json: true
+

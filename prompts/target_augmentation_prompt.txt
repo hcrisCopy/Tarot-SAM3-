@@ -1,0 +1,8 @@
+Given the target object name, generate three SAM3-compatible text prompts.
+
+Rules:
+- Keep prompt 1 exactly the original target name.
+- Prompt 2 should be a synonym or visually equivalent phrase.
+- Prompt 3 should be a concise visual concept likely to match the object in the image.
+- Return strict JSON: {"prompts": ["...", "...", "..."]}.
+

@@ -1,0 +1,26 @@
+--extra-index-url https://download.pytorch.org/whl/cu128
+
+torch==2.10.0
+torchvision
+git+https://github.com/huggingface/transformers
+accelerate
+qwen-vl-utils[decord]==0.0.8
+huggingface_hub
+
+numpy
+scipy
+pandas
+pillow
+opencv-python
+pycocotools
+scikit-image
+matplotlib
+tqdm
+PyYAML
+einops
+ninja
+
+pytest
+ipykernel
+jupyter
+

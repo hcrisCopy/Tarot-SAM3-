@@ -1,0 +1,8 @@
+Given an image, a referring expression, and candidate masks, choose the mask that best matches the target.
+
+Return strict JSON:
+{
+  "best_index": 0,
+  "reason": "..."
+}
+
