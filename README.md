@@ -65,6 +65,7 @@ conda create -n tarot-sam3 python=3.12 -y
 conda activate tarot-sam3
 pip install torch==2.10.0 torchvision --index-url https://download.pytorch.org/whl/cu128
 pip install -r requirements.txt
+pip install Cython
 ```
 
 ## External Repositories

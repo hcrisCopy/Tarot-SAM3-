@@ -28,4 +28,5 @@ outputs/**/*
 
 *.log
 *.tmp
+*.pdf
 
