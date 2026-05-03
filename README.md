@@ -202,6 +202,7 @@ models:
   sam3:
     checkpoint_dir: checkpoints/sam3
     confidence_threshold: 0.25
+    dtype: float32
   dino:
     local_path: checkpoints/dinov3-vitb16
 
@@ -218,7 +219,10 @@ method:
 ```
 
 If SAM3 returns too few masks, lower `models.sam3.confidence_threshold`. If text
-masks are filtered too aggressively, lower `method.tau`.
+masks are filtered too aggressively, lower `method.tau`. Keep `models.sam3.dtype`
+as `float32` for the first successful single-image run; SAM3 currently creates
+some internal float32 tensors, so fp16/bf16 can trigger dtype mismatch errors in
+some environments.
 
 ## Code Status
 

@@ -23,7 +23,7 @@ from tarot_sam3.utils.geometry import (
 
 def _torch_dtype(name: str | None) -> torch.dtype:
     if not name:
-        return torch.bfloat16 if torch.cuda.is_available() else torch.float32
+        return torch.float32
     return {
         "float16": torch.float16,
         "fp16": torch.float16,
@@ -102,7 +102,25 @@ class Sam3Segmentor:
     def _fresh_state(self) -> dict[str, Any]:
         if self.state is None:
             raise RuntimeError("Call set_image before prompting SAM3.")
-        return copy.copy(self.state)
+        state = copy.copy(self.state)
+        self._cast_state_dtype(state)
+        return state
+
+    def _cast_value_dtype(self, value: Any) -> Any:
+        if isinstance(value, torch.Tensor) and value.is_floating_point():
+            return value.to(dtype=self.dtype)
+        if isinstance(value, dict):
+            return {key: self._cast_value_dtype(item) for key, item in value.items()}
+        if isinstance(value, list):
+            return [self._cast_value_dtype(item) for item in value]
+        if isinstance(value, tuple):
+            return tuple(self._cast_value_dtype(item) for item in value)
+        return value
+
+    def _cast_state_dtype(self, state: dict[str, Any]) -> None:
+        if "backbone_out" in state:
+            state["backbone_out"] = self._cast_value_dtype(state["backbone_out"])
+        self._cast_geometric_prompt(state)
 
     def _patch_backbone_input_dtype(self) -> None:
         original_forward_image = self.model.backbone.forward_image
@@ -119,6 +137,7 @@ class Sam3Segmentor:
         original_forward_grounding = self.processor._forward_grounding
 
         def forward_grounding_with_prompt_dtype(state):
+            self._cast_state_dtype(state)
             self._cast_geometric_prompt(state)
             return original_forward_grounding(state)
 
