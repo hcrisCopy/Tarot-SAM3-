@@ -20,6 +20,7 @@ models:
     repo_path: external/sam3
     checkpoint_dir: checkpoints/sam3
     confidence_threshold: 0.25
+    dtype: bfloat16
   dino:
     name: facebook/dinov3-vitb16-pretrain-lvd1689m
     local_path: checkpoints/dinov3-vitb16

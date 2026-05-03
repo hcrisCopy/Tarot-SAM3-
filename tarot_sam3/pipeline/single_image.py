@@ -91,9 +91,9 @@ class SingleImagePipeline:
         self.device = runtime.get("device", "cuda")
         self.output_dir = Path(self.cfg.get("project", {}).get("output_dir", "outputs"))
 
-        self.qwen = QwenVLReasoner(models.get("mllm", {}))
         self.sam3 = Sam3Segmentor(models.get("sam3", {}), paths=self.cfg.get("paths", {}), device=self.device)
         self.dino = DinoFeatureExtractor(models.get("dino", {}), device=self.device)
+        self.qwen = QwenVLReasoner(models.get("mllm", {}))
 
         self.eri = ExpressionReasoningInterpreter(
             self.qwen,
@@ -139,4 +139,3 @@ class SingleImagePipeline:
             eri=eri_output,
             msr=msr_output,
         )
-

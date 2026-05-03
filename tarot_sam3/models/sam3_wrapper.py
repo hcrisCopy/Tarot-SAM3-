@@ -21,6 +21,19 @@ from tarot_sam3.utils.geometry import (
 )
 
 
+def _torch_dtype(name: str | None) -> torch.dtype:
+    if not name:
+        return torch.bfloat16 if torch.cuda.is_available() else torch.float32
+    return {
+        "float16": torch.float16,
+        "fp16": torch.float16,
+        "bfloat16": torch.bfloat16,
+        "bf16": torch.bfloat16,
+        "float32": torch.float32,
+        "fp32": torch.float32,
+    }.get(name.lower(), torch.float32)
+
+
 class Sam3Segmentor:
     """Single-image SAM3 prompt interface."""
 
@@ -41,14 +54,17 @@ class Sam3Segmentor:
         from sam3.model.sam3_image_processor import Sam3Processor
         from sam3.model_builder import build_sam3_image_model
 
+        torch.set_default_dtype(torch.float32)
         self.device = device
+        self.dtype = _torch_dtype(cfg.get("dtype"))
         self.model = build_sam3_image_model(
             device=device,
             checkpoint_path=checkpoint_path,
             load_from_HF=checkpoint_path is None,
             enable_inst_interactivity=False,
         )
-        self.model.float()
+        self.model.to(dtype=self.dtype)
+        self._patch_backbone_input_dtype()
         self.processor = Sam3Processor(
             self.model,
             device=device,
@@ -86,6 +102,17 @@ class Sam3Segmentor:
         if self.state is None:
             raise RuntimeError("Call set_image before prompting SAM3.")
         return copy.copy(self.state)
+
+    def _patch_backbone_input_dtype(self) -> None:
+        original_forward_image = self.model.backbone.forward_image
+        dtype = self.dtype
+
+        def forward_image_with_dtype(image, *args, **kwargs):
+            if hasattr(image, "to"):
+                image = image.to(dtype=dtype)
+            return original_forward_image(image, *args, **kwargs)
+
+        self.model.backbone.forward_image = forward_image_with_dtype
 
     def _sam3_precision_context(self):
         if str(self.device).startswith("cuda") and torch.cuda.is_available():
