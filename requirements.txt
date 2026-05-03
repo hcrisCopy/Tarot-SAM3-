@@ -19,8 +19,9 @@ tqdm
 PyYAML
 einops
 ninja
+timm
+safetensors
 
 pytest
 ipykernel
 jupyter
-

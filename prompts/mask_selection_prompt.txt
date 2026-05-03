@@ -1,8 +1,14 @@
-Given an image, a referring expression, and candidate masks, choose the mask that best matches the target.
+Given an image panel, a referring expression, and candidate masks, choose the mask
+that best matches the target.
 
-Return strict JSON:
+Return strict JSON only:
 {
   "best_index": 0,
-  "reason": "..."
+  "reason": "brief reason"
 }
 
+Rules:
+- Candidate indexes are drawn in the panel from left to right.
+- Prefer the mask that covers the complete referred target and excludes distractors.
+- If the target is a part or region, prefer the part/region rather than the whole object.
+- Do not include markdown or explanations outside JSON.

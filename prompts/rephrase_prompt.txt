@@ -1,11 +1,13 @@
 Rephrase the original referring expression into two target-centric expressions.
 
-Return strict JSON:
+Return strict JSON only:
 {
-  "short_expression": "...",
-  "long_expression": "..."
+  "short_expression": "short target phrase",
+  "long_expression": "target phrase plus useful relation context"
 }
 
-The short expression should be concise.
-The long expression should preserve useful relation context.
-
+Rules:
+- The short expression should be concise and easy for a detector to localize.
+- The long expression should preserve useful relation context from the original query.
+- Do not change the intended target.
+- Do not include markdown or explanations outside JSON.

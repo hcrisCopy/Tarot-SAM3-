@@ -1,9 +1,14 @@
-Given the target name, a refer object name, and the detected refer-object box, describe the visual relationship that can verify whether a candidate target mask is correct.
+Given the image, target name, refer object name, and detected refer-object box,
+describe the visual relationship that can verify whether a candidate target mask is correct.
 
-Return strict JSON:
+Return strict JSON only:
 {
-  "relationship": "...",
-  "positive_criteria": ["..."],
-  "negative_criteria": ["..."]
+  "relationship": "brief relation between target and refer object",
+  "positive_criteria": ["what should be true for a correct target mask"],
+  "negative_criteria": ["what would indicate a wrong mask"]
 }
 
+Rules:
+- Focus on visible spatial, functional, or attribute relations.
+- Keep each criterion short and checkable.
+- Do not include markdown or explanations outside JSON.

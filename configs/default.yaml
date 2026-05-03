@@ -19,8 +19,9 @@ models:
   sam3:
     repo_path: external/sam3
     checkpoint_dir: checkpoints/sam3
+    confidence_threshold: 0.25
   dino:
-    name: facebook/dinov3-vits16-pretrain-lvd1689m
+    name: facebook/dinov3-vitb16-pretrain-lvd1689m
     local_path: checkpoints/dinov3-vitb16
     dtype: float16
 
@@ -30,6 +31,7 @@ method:
   text_prompt_topk: 3
   mask_score_topk: 5
   point_prompt:
+    anchor_count: 5
     max_positive_points: 2
     max_negative_points: 1
   msr:
@@ -41,4 +43,3 @@ runtime:
   num_workers: 4
   save_visualizations: true
   save_intermediate_json: true
-

@@ -1,8 +1,16 @@
-"""Single-image inference entrypoint placeholder."""
+"""Run Tarot-SAM3 on one image."""
 
 from __future__ import annotations
 
 import argparse
+import sys
+from pathlib import Path
+
+REPO_ROOT = Path(__file__).resolve().parents[1]
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
+
+from tarot_sam3.pipeline import SingleImagePipeline
 
 
 def parse_args() -> argparse.Namespace:
@@ -16,12 +24,11 @@ def parse_args() -> argparse.Namespace:
 
 def main() -> None:
     args = parse_args()
-    raise NotImplementedError(
-        "Pipeline implementation is pending. "
-        f"Received image={args.image!r}, query={args.query!r}, config={args.config!r}."
-    )
+    pipeline = SingleImagePipeline(args.config)
+    result = pipeline.run(args.image, args.query, args.output)
+    print(f"Saved visualization: {result.output_path}")
+    print(f"Saved intermediate JSON: {result.json_path}")
 
 
 if __name__ == "__main__":
     main()
-
