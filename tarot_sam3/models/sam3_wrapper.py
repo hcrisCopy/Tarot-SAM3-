@@ -135,6 +135,8 @@ class Sam3Segmentor:
 
     def _sam3_precision_context(self):
         if str(self.device).startswith("cuda") and torch.cuda.is_available():
+            if self.dtype in {torch.float16, torch.bfloat16}:
+                return torch.autocast(device_type="cuda", dtype=self.dtype, enabled=True)
             return torch.autocast(device_type="cuda", enabled=False)
         return contextlib.nullcontext()
 
