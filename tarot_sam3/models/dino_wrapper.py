@@ -26,6 +26,20 @@ class DinoFeatureExtractor:
         self._grid_hw: tuple[int, int] | None = None
         self._image_size: tuple[int, int] | None = None
 
+    @staticmethod
+    def _patch_tokens(tokens: torch.Tensor) -> tuple[torch.Tensor, int, int]:
+        """Drop CLS/register tokens and return square patch tokens."""
+        n_tokens = tokens.shape[0]
+        for prefix_len in range(0, min(32, n_tokens) + 1):
+            remaining = n_tokens - prefix_len
+            side = int(remaining**0.5)
+            if side > 0 and side * side == remaining:
+                return tokens[prefix_len:], side, side
+        raise RuntimeError(
+            "Cannot infer DINO feature grid from "
+            f"{n_tokens} tokens. Expected square patch tokens after optional CLS/register prefix."
+        )
+
     @torch.inference_mode()
     def set_image(self, image: Image.Image) -> None:
         image = image.convert("RGB")
@@ -37,16 +51,7 @@ class DinoFeatureExtractor:
             tokens = outputs[0]
         tokens = tokens.squeeze(0)
 
-        n_tokens = tokens.shape[0]
-        side = int((n_tokens - 1) ** 0.5)
-        if side * side == n_tokens - 1:
-            tokens = tokens[1:]
-            grid_h = grid_w = side
-        else:
-            side = int(n_tokens**0.5)
-            if side * side != n_tokens:
-                raise RuntimeError(f"Cannot infer DINO feature grid from {n_tokens} tokens.")
-            grid_h = grid_w = side
+        tokens, grid_h, grid_w = self._patch_tokens(tokens)
 
         features = F.normalize(tokens.float(), dim=-1)
         self._features = features.reshape(grid_h, grid_w, -1)
@@ -76,4 +81,3 @@ class DinoFeatureExtractor:
             raise ValueError("At least one point is required.")
         maps = [self.similarity_map(point) for point in points]
         return np.mean(np.stack(maps, axis=0), axis=0)
-
