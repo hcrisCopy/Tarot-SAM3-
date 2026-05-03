@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import copy
 import sys
+import types
 from pathlib import Path
 from typing import Any
 
@@ -33,6 +34,8 @@ class Sam3Segmentor:
             candidate = checkpoint_dir / "sam3.pt"
             checkpoint_path = str(candidate) if candidate.exists() else None
 
+        self._ensure_pkg_resources_shim(repo_path)
+
         from sam3.model.sam3_image_processor import Sam3Processor
         from sam3.model_builder import build_sam3_image_model
 
@@ -60,6 +63,23 @@ class Sam3Segmentor:
         predictor = getattr(self.model, "inst_interactive_predictor", None)
         if predictor is not None:
             predictor.set_image(self.image)
+
+    @staticmethod
+    def _ensure_pkg_resources_shim(repo_path: Path) -> None:
+        try:
+            import pkg_resources  # noqa: F401
+            return
+        except ModuleNotFoundError:
+            pass
+
+        shim = types.ModuleType("pkg_resources")
+
+        def resource_filename(package_name: str, resource_name: str) -> str:
+            package_path = repo_path / package_name.replace(".", "/")
+            return str((package_path / resource_name).resolve())
+
+        shim.resource_filename = resource_filename  # type: ignore[attr-defined]
+        sys.modules["pkg_resources"] = shim
 
     def _fresh_state(self) -> dict[str, Any]:
         if self.state is None:
@@ -163,4 +183,3 @@ class Sam3Segmentor:
             candidate.metadata["negative_points"] = negative_points
             candidate.metadata["point_fallback"] = "tiny_box"
         return candidates
-
