@@ -56,7 +56,8 @@ class Sam3Segmentor:
 
         torch.set_default_dtype(torch.float32)
         self.device = device
-        self.dtype = _torch_dtype(cfg.get("dtype"))
+        self.allow_low_precision = bool(cfg.get("allow_low_precision", False))
+        self.dtype = _torch_dtype(cfg.get("dtype")) if self.allow_low_precision else torch.float32
         self.model = build_sam3_image_model(
             device=device,
             checkpoint_path=checkpoint_path,
@@ -71,6 +72,7 @@ class Sam3Segmentor:
             confidence_threshold=float(cfg.get("confidence_threshold", 0.25)),
         )
         self._patch_processor_prompt_dtype()
+        print(f"[Tarot-SAM3] SAM3 dtype={self.dtype}, allow_low_precision={self.allow_low_precision}")
         self.image: Image.Image | None = None
         self.state: dict[str, Any] | None = None
         self.width = 0
@@ -154,7 +156,7 @@ class Sam3Segmentor:
 
     def _sam3_precision_context(self):
         if str(self.device).startswith("cuda") and torch.cuda.is_available():
-            if self.dtype in {torch.float16, torch.bfloat16}:
+            if self.allow_low_precision and self.dtype in {torch.float16, torch.bfloat16}:
                 return torch.autocast(device_type="cuda", dtype=self.dtype, enabled=True)
             return torch.autocast(device_type="cuda", enabled=False)
         return contextlib.nullcontext()
