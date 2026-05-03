@@ -70,6 +70,7 @@ class Sam3Segmentor:
             device=device,
             confidence_threshold=float(cfg.get("confidence_threshold", 0.25)),
         )
+        self._patch_processor_prompt_dtype()
         self.image: Image.Image | None = None
         self.state: dict[str, Any] | None = None
         self.width = 0
@@ -113,6 +114,24 @@ class Sam3Segmentor:
             return original_forward_image(image, *args, **kwargs)
 
         self.model.backbone.forward_image = forward_image_with_dtype
+
+    def _patch_processor_prompt_dtype(self) -> None:
+        original_forward_grounding = self.processor._forward_grounding
+
+        def forward_grounding_with_prompt_dtype(state):
+            self._cast_geometric_prompt(state)
+            return original_forward_grounding(state)
+
+        self.processor._forward_grounding = forward_grounding_with_prompt_dtype
+
+    def _cast_geometric_prompt(self, state: dict[str, Any]) -> None:
+        prompt = state.get("geometric_prompt")
+        if prompt is None:
+            return
+        for attr in ["box_embeddings", "point_embeddings", "mask_embeddings"]:
+            value = getattr(prompt, attr, None)
+            if value is not None and hasattr(value, "to") and value.is_floating_point():
+                setattr(prompt, attr, value.to(dtype=self.dtype))
 
     def _sam3_precision_context(self):
         if str(self.device).startswith("cuda") and torch.cuda.is_available():
@@ -192,7 +211,7 @@ class Sam3Segmentor:
                 point_tensor = torch.tensor(
                     norm_points,
                     device=self.device,
-                    dtype=torch.float32,
+                    dtype=self.dtype,
                 ).view(len(norm_points), 1, 2)
                 label_tensor = torch.tensor(
                     [1] * len(positive_points) + [0] * len(negative_points),
