@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Any
 
 import numpy as np
+import torch
 from PIL import Image
 
 from tarot_sam3.utils.geometry import (
@@ -44,7 +45,7 @@ class Sam3Segmentor:
             device=device,
             checkpoint_path=checkpoint_path,
             load_from_HF=checkpoint_path is None,
-            enable_inst_interactivity=True,
+            enable_inst_interactivity=False,
         )
         self.processor = Sam3Processor(
             self.model,
@@ -60,9 +61,6 @@ class Sam3Segmentor:
         self.image = image.convert("RGB")
         self.width, self.height = self.image.size
         self.state = self.processor.set_image(self.image)
-        predictor = getattr(self.model, "inst_interactive_predictor", None)
-        if predictor is not None:
-            predictor.set_image(self.image)
 
     @staticmethod
     def _ensure_pkg_resources_shim(repo_path: Path) -> None:
@@ -142,44 +140,45 @@ class Sam3Segmentor:
         limit: int | None = None,
     ) -> list[MaskCandidate]:
         negative_points = negative_points or []
-        predictor = getattr(self.model, "inst_interactive_predictor", None)
-        if predictor is not None:
-            points = np.array(positive_points + negative_points, dtype=np.float32)
-            labels = np.array([1] * len(positive_points) + [0] * len(negative_points), dtype=np.int32)
-            masks, scores, _ = predictor.predict(
-                point_coords=points,
-                point_labels=labels,
-                multimask_output=True,
-                return_logits=False,
-            )
-            candidates = [
-                MaskCandidate(
-                    mask=np.squeeze(mask).astype(bool),
-                    score=float(score),
-                    box=None,
-                    prompt=text_hint,
-                    prompt_type="point",
-                    metadata={"positive_points": positive_points, "negative_points": negative_points},
-                )
-                for mask, score in zip(masks, scores, strict=False)
-            ]
-            candidates.sort(key=lambda item: (item.score, item.area()), reverse=True)
-            return candidates[:limit] if limit else candidates
-
         state = self._fresh_state()
         state = self.processor.set_text_prompt(prompt=text_hint or "visual", state=state)
-        output = None
-        for point in positive_points:
-            box = box_xyxy_to_cxcywh_norm(point_to_tiny_box(point, self.width, self.height), self.width, self.height)
-            output = self.processor.add_geometric_prompt(box=box, label=True, state=state)
-        for point in negative_points:
-            box = box_xyxy_to_cxcywh_norm(point_to_tiny_box(point, self.width, self.height), self.width, self.height)
-            output = self.processor.add_geometric_prompt(box=box, label=False, state=state)
-        if output is None:
+        all_points = positive_points + negative_points
+        if not all_points:
             return []
-        candidates = self._to_candidates(output, prompt=text_hint, prompt_type="point", limit=limit)
+
+        try:
+            norm_points = [
+                [float(x) / max(self.width, 1), float(y) / max(self.height, 1)]
+                for x, y in all_points
+            ]
+            point_tensor = torch.tensor(
+                norm_points,
+                device=self.device,
+                dtype=torch.float32,
+            ).view(len(norm_points), 1, 2)
+            label_tensor = torch.tensor(
+                [1] * len(positive_points) + [0] * len(negative_points),
+                device=self.device,
+                dtype=torch.long,
+            ).view(len(norm_points), 1)
+            state["geometric_prompt"].append_points(point_tensor, label_tensor)
+            output = self.processor._forward_grounding(state)
+            candidates = self._to_candidates(output, prompt=text_hint, prompt_type="point", limit=limit)
+        except Exception:
+            output = None
+            for point in positive_points:
+                box = box_xyxy_to_cxcywh_norm(point_to_tiny_box(point, self.width, self.height), self.width, self.height)
+                output = self.processor.add_geometric_prompt(box=box, label=True, state=state)
+            for point in negative_points:
+                box = box_xyxy_to_cxcywh_norm(point_to_tiny_box(point, self.width, self.height), self.width, self.height)
+                output = self.processor.add_geometric_prompt(box=box, label=False, state=state)
+            if output is None:
+                return []
+            candidates = self._to_candidates(output, prompt=text_hint, prompt_type="point", limit=limit)
+            for candidate in candidates:
+                candidate.metadata["point_fallback"] = "tiny_box"
+
         for candidate in candidates:
             candidate.metadata["positive_points"] = positive_points
             candidate.metadata["negative_points"] = negative_points
-            candidate.metadata["point_fallback"] = "tiny_box"
         return candidates
