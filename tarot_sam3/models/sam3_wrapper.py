@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import copy
+import contextlib
 import sys
 import types
 from pathlib import Path
@@ -47,6 +48,7 @@ class Sam3Segmentor:
             load_from_HF=checkpoint_path is None,
             enable_inst_interactivity=False,
         )
+        self.model.float()
         self.processor = Sam3Processor(
             self.model,
             device=device,
@@ -60,7 +62,8 @@ class Sam3Segmentor:
     def set_image(self, image: Image.Image) -> None:
         self.image = image.convert("RGB")
         self.width, self.height = self.image.size
-        self.state = self.processor.set_image(self.image)
+        with self._sam3_precision_context():
+            self.state = self.processor.set_image(self.image)
 
     @staticmethod
     def _ensure_pkg_resources_shim(repo_path: Path) -> None:
@@ -83,6 +86,11 @@ class Sam3Segmentor:
         if self.state is None:
             raise RuntimeError("Call set_image before prompting SAM3.")
         return copy.copy(self.state)
+
+    def _sam3_precision_context(self):
+        if str(self.device).startswith("cuda") and torch.cuda.is_available():
+            return torch.autocast(device_type="cuda", enabled=False)
+        return contextlib.nullcontext()
 
     @staticmethod
     def _to_candidates(output: dict[str, Any], prompt: str, prompt_type: str, limit: int | None = None) -> list[MaskCandidate]:
@@ -113,7 +121,8 @@ class Sam3Segmentor:
 
     def predict_text(self, prompt: str, limit: int | None = None) -> list[MaskCandidate]:
         state = self._fresh_state()
-        output = self.processor.set_text_prompt(prompt=prompt, state=state)
+        with self._sam3_precision_context():
+            output = self.processor.set_text_prompt(prompt=prompt, state=state)
         return self._to_candidates(output, prompt=prompt, prompt_type="text", limit=limit)
 
     def predict_box(
@@ -124,9 +133,10 @@ class Sam3Segmentor:
         limit: int | None = None,
     ) -> list[MaskCandidate]:
         state = self._fresh_state()
-        state = self.processor.set_text_prompt(prompt=text_hint or "visual", state=state)
         norm_box = box_xyxy_to_cxcywh_norm(box_xyxy, self.width, self.height)
-        output = self.processor.add_geometric_prompt(box=norm_box, label=label, state=state)
+        with self._sam3_precision_context():
+            state = self.processor.set_text_prompt(prompt=text_hint or "visual", state=state)
+            output = self.processor.add_geometric_prompt(box=norm_box, label=label, state=state)
         candidates = self._to_candidates(output, prompt=text_hint, prompt_type="box", limit=limit)
         for candidate in candidates:
             candidate.metadata["input_box"] = clip_box_xyxy(box_xyxy, self.width, self.height)
@@ -141,37 +151,40 @@ class Sam3Segmentor:
     ) -> list[MaskCandidate]:
         negative_points = negative_points or []
         state = self._fresh_state()
-        state = self.processor.set_text_prompt(prompt=text_hint or "visual", state=state)
         all_points = positive_points + negative_points
         if not all_points:
             return []
 
         try:
-            norm_points = [
-                [float(x) / max(self.width, 1), float(y) / max(self.height, 1)]
-                for x, y in all_points
-            ]
-            point_tensor = torch.tensor(
-                norm_points,
-                device=self.device,
-                dtype=torch.float32,
-            ).view(len(norm_points), 1, 2)
-            label_tensor = torch.tensor(
-                [1] * len(positive_points) + [0] * len(negative_points),
-                device=self.device,
-                dtype=torch.long,
-            ).view(len(norm_points), 1)
-            state["geometric_prompt"].append_points(point_tensor, label_tensor)
-            output = self.processor._forward_grounding(state)
+            with self._sam3_precision_context():
+                state = self.processor.set_text_prompt(prompt=text_hint or "visual", state=state)
+                norm_points = [
+                    [float(x) / max(self.width, 1), float(y) / max(self.height, 1)]
+                    for x, y in all_points
+                ]
+                point_tensor = torch.tensor(
+                    norm_points,
+                    device=self.device,
+                    dtype=torch.float32,
+                ).view(len(norm_points), 1, 2)
+                label_tensor = torch.tensor(
+                    [1] * len(positive_points) + [0] * len(negative_points),
+                    device=self.device,
+                    dtype=torch.long,
+                ).view(len(norm_points), 1)
+                state["geometric_prompt"].append_points(point_tensor, label_tensor)
+                output = self.processor._forward_grounding(state)
             candidates = self._to_candidates(output, prompt=text_hint, prompt_type="point", limit=limit)
         except Exception:
             output = None
-            for point in positive_points:
-                box = box_xyxy_to_cxcywh_norm(point_to_tiny_box(point, self.width, self.height), self.width, self.height)
-                output = self.processor.add_geometric_prompt(box=box, label=True, state=state)
-            for point in negative_points:
-                box = box_xyxy_to_cxcywh_norm(point_to_tiny_box(point, self.width, self.height), self.width, self.height)
-                output = self.processor.add_geometric_prompt(box=box, label=False, state=state)
+            with self._sam3_precision_context():
+                state = self.processor.set_text_prompt(prompt=text_hint or "visual", state=self._fresh_state())
+                for point in positive_points:
+                    box = box_xyxy_to_cxcywh_norm(point_to_tiny_box(point, self.width, self.height), self.width, self.height)
+                    output = self.processor.add_geometric_prompt(box=box, label=True, state=state)
+                for point in negative_points:
+                    box = box_xyxy_to_cxcywh_norm(point_to_tiny_box(point, self.width, self.height), self.width, self.height)
+                    output = self.processor.add_geometric_prompt(box=box, label=False, state=state)
             if output is None:
                 return []
             candidates = self._to_candidates(output, prompt=text_hint, prompt_type="point", limit=limit)

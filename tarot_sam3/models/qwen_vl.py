@@ -58,13 +58,17 @@ class QwenVLReasoner:
 
             model_cls = AutoModelForVision2Seq
 
+        default_dtype = torch.get_default_dtype()
         self.processor = AutoProcessor.from_pretrained(model_path, trust_remote_code=True)
-        self.model = model_cls.from_pretrained(
-            model_path,
-            torch_dtype=_torch_dtype(self.cfg.dtype),
-            device_map=self.cfg.device_map,
-            trust_remote_code=True,
-        )
+        try:
+            self.model = model_cls.from_pretrained(
+                model_path,
+                torch_dtype=_torch_dtype(self.cfg.dtype),
+                device_map=self.cfg.device_map,
+                trust_remote_code=True,
+            )
+        finally:
+            torch.set_default_dtype(default_dtype)
         self.model.eval()
 
     def generate(self, image: Image.Image, prompt: str, max_new_tokens: int | None = None) -> str:
@@ -115,4 +119,3 @@ class QwenVLReasoner:
 
     def generate_json(self, image: Image.Image, prompt: str, max_new_tokens: int | None = None) -> dict[str, Any]:
         return extract_json_object(self.generate(image, prompt, max_new_tokens=max_new_tokens))
-
